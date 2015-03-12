@@ -1,54 +1,98 @@
 <?php
 
 /**
- * Implementation of hook_permission().
+ * @file
+ * Contains module functions and Drupal hooks
+ */
+
+/**
+ * DRUPAL HOOKS
+ */
+
+/**
+ * Implements hook_permission().
  */
 function mysearch_permission() {
   return array(
     'access mysearch' => array(
-        'title' => 'Access My Search',
-        'description' => 'Allows a user to access search results',
-      )
-    );
+      'title' => 'Access My Search',
+      'description' => 'Allows a user to access search results',
+    )
+  );
 }
 
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  */
 function mysearch_menu() {
-  $items['mysearch'] = array(
+  $items['mysearch/%'] = array(
     'title' => 'Search',
     'page callback' => 'mysearch_searchpage',
+    'page arguments' => [1],
     'access arguments' => array('access mysearch'),
     'type' => MENU_SUGGESTED_ITEM,
   );
   return $items;
 }
 
+/**
+ * Implements hook_theme().
+ */
+function mysearch_theme() {
+  return array(
+    'mysearch_search_results' => array(
+      'variables' => array('search_results' => [], 'keys' => NULL),
+      'path' => drupal_get_path('module', 'mysearch') . '/tpl',
+      'template' => 'mysearch-search-results',
+    ),
+  );
+}
 
 /**
- * Menu callback provides a simple list of nodes matching the
- * search term Example: hitting the URL:
- *   http://domain.com/mysearch/example
+ * Process variables for mysearch-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $search_results
+ * - $keys
+ *
+ * @see mysearch-search-results.tpl.php
+ */
+function mysearch_preprocess_mysearch_search_results(&$variables) {
+  foreach ($variables['search_results'] as $index => $result) {
+    $node_uri = 'node/' . $result->nid;
+    $options = ['attributes' => ['title' => $result->title]];
+    $variables['search_results'][$index]->node_link = l($result->title, $node_uri, $options);
+  }
+}
+
+/**
+ * MODULE FUNCTIONS
+ */
+
+/**
+ * Menu callback
+ * Provides a simple list of nodes matching the search term
+ * Example: hitting the URL: http://domain.com/mysearch/example
  * will return a list of links to nodes which have the word
  * example in them.
+ *
+ * @param string $keys
+ * @return string
  */
-function mysearch_searchpage() {
-  $searchterm = arg(1);
-  $query = "
-     SELECT nid
-     FROM node_revisions
-     WHERE body LIKE '%$searchterm%'
-     ";
-  $search_results = db_query($query); 
-  $search_results = "<h2>Search for $searchterm</h2><ul>";
-  foreach($get_node_result as $record)) {
-    $node = node_load($record->nid);
-    $search_results .= '<li><a href="/node/'
-     . $node->nid . '" title="' . $node->title . '">'
-     . $node->title . '</a><!-- debugging output: '
-     . print_r($node) . '  --><\li>';
-  }
-  return $search_results;
+function mysearch_searchpage($keys) {
+  $keys = trim($keys);
+
+  $query = db_select('node', 'n')
+          ->fields('n', ['nid', 'title'])
+          ->condition('n.title', '%' . $keys . '%', 'like');
+
+  $search_results = $query->execute()
+                          ->fetchAllAssoc('nid');
+
+  drupal_set_title(t('Search for @keys', ['@keys' => $keys]));
+  return theme('mysearch_search_results', [
+    'search_results' => $search_results,
+    'keys' => $keys
+  ]);
 }
