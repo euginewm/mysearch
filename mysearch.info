@@ -1,0 +1,6 @@
+name = MySearch
+description = A simple search module
+
+dependencies[] = search
+core = 7.x
+package = Search
